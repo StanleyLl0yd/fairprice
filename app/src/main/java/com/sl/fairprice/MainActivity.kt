@@ -1,6 +1,5 @@
 package com.sl.fairprice
 
-import android.graphics.BitmapFactory
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -38,18 +37,7 @@ class MainActivity: ComponentActivity() {
       running=true; result=null; failure=null
       try {
        result=withContext(Dispatchers.IO) {
-        val bounds=BitmapFactory.Options().apply { inJustDecodeBounds=true }
-        (contentResolver.openInputStream(uri) ?: error("Cannot open image")).use {
-         BitmapFactory.decodeStream(it,null,bounds)
-        }
-        val largest=maxOf(bounds.outWidth,bounds.outHeight)
-        check(largest>0) { "Invalid image dimensions" }
-        var sample=1
-        while (largest/sample>2048) sample*=2
-        val options=BitmapFactory.Options().apply { inSampleSize=sample }
-        val bitmap=contentResolver.openInputStream(uri)?.use {
-         BitmapFactory.decodeStream(it,null,options)
-        } ?: error("Cannot decode image")
+        val bitmap=com.sl.fairprice.camera.OcrImageLoader.decode(this@MainActivity,uri)
         try { TesseractOfflineOcr(this@MainActivity).recognize(bitmap) }
         finally { bitmap.recycle() }
        }
