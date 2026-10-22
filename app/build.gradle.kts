@@ -20,8 +20,8 @@ android {
   applicationId = "com.sl.fairprice"
   minSdk = 26
   targetSdk = 36
-  versionCode = if (signedPreviewMode) 2 else 1
-  versionName = if (signedPreviewMode) "0.0.1-ocr-preview.2" else "0.0.1-ocr-probe"
+  versionCode = if (signedPreviewMode) 3 else 1
+  versionName = if (signedPreviewMode) "0.0.2-comparison-preview.3" else "0.0.1-ocr-probe"
   testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   val instrumentationAbi = providers.gradleProperty("fairprice.ocrTestAbi").orNull
   require(instrumentationAbi == null || instrumentationAbi == "x86_64") {
