@@ -140,10 +140,9 @@ def main():
     p.add_argument("--manifest", required=True, type=Path)
     p.add_argument("--predictions", required=True, type=Path)
     p.add_argument("--photos", required=True, type=Path)
-    p.add_argument("--minimum", default=100, type=int)
     args = p.parse_args()
     try:
-        result = evaluate(args.manifest, args.predictions, args.photos, args.minimum)
+        result = evaluate(args.manifest, args.predictions, args.photos)
     except (ValueError, OSError) as exc:
         print(f"INVALID CORPUS: {exc}", file=sys.stderr)
         return 2
