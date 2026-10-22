@@ -1,6 +1,10 @@
 <resources>
  <string name="app_name">FairPrice</string>
- <string name="probe_subtitle">Offline Russian price-label OCR prototype</string>
+ <string name="probe_subtitle">Offline OCR test preview: recognition only, without product comparison.</string>
+ <string name="run_self_test">Run OCR self-test</string>
+ <string name="self_test_result">Self-test result</string>
+ <string name="copy_report">Copy report</string>
+ <string name="report_copied">Report copied</string>
  <string name="pick_photo">Choose a photo</string>
  <string name="processing">Recognizing…</string>
  <string name="price_candidates">Price candidates</string>

@@ -1,6 +1,10 @@
 <resources>
  <string name="app_name">FairPrice</string>
- <string name="probe_subtitle">Локальный прототип OCR: русский ценник</string>
+ <string name="probe_subtitle">Тестовый офлайн OCR: пока только распознавание ценников, без сравнения товаров.</string>
+ <string name="run_self_test">Самопроверка OCR</string>
+ <string name="self_test_result">Результат самопроверки</string>
+ <string name="copy_report">Скопировать отчёт</string>
+ <string name="report_copied">Отчёт скопирован</string>
  <string name="pick_photo">Выбрать фотографию</string>
  <string name="processing">Распознавание…</string>
  <string name="price_candidates">Кандидаты цены</string>

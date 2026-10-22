@@ -57,3 +57,7 @@ PaddleOCR candidate feasibility status.
 Stage 0 requires verified on-device OCR, a fair comparison against PaddleOCR, third-party licensing and ABI checks, and quality evaluation against at least 100 **real** Russian store labels. Target extraction accuracy is >=98% for readable prices and >=95% for quantities. Do not silently accept ambiguous prices.
 
 Stage 1-4 (math, UI comparison, camera, real-photo release testing) are not accepted. Project license has not been selected. RuStore publication requires separate authorization.
+
+## Installable OCR device preview
+
+The independently testable **debug-signed prerelease** is produced through GitHub Actions only after successful exact-main CI. See [test instructions](docs/TEST_RELEASE.md). The APK runs offline and includes a synthetic self-check with copyable diagnostics. **Neither a prerelease nor its self-check completes Stage 0 or constitutes authorization for RuStore publication.**

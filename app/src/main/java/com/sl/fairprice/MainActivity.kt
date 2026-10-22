@@ -1,6 +1,8 @@
 package com.sl.fairprice
 
 import android.os.Bundle
+import android.content.ClipData
+import android.content.ClipboardManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -16,6 +18,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.sl.fairprice.model.OcrResult
 import com.sl.fairprice.ocr.TesseractOfflineOcr
+import com.sl.fairprice.ocr.OcrSelfTest
 import com.sl.fairprice.parser.Measure
 import com.sl.fairprice.parser.PriceKind
 import com.sl.fairprice.parser.PriceLabelParser
@@ -32,9 +35,11 @@ class MainActivity: ComponentActivity() {
     var result by remember { mutableStateOf<OcrResult?>(null) }
     var running by remember { mutableStateOf(false) }
     var failure by remember { mutableStateOf<String?>(null) }
+    var selfTestReport by remember { mutableStateOf<String?>(null) }
+    var reportCopied by remember { mutableStateOf(false) }
     val picker=rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
      if (uri != null && !running) scope.launch {
-      running=true; result=null; failure=null
+      running=true; result=null; failure=null; selfTestReport=null; reportCopied=false
       try {
        result=withContext(Dispatchers.IO) {
         val bitmap=com.sl.fairprice.camera.OcrImageLoader.decode(this@MainActivity,uri)
@@ -51,6 +56,19 @@ class MainActivity: ComponentActivity() {
       Text(stringResource(R.string.app_name),style=MaterialTheme.typography.headlineMedium)
       Text(stringResource(R.string.probe_subtitle))
       Button(enabled=!running, onClick={
+       scope.launch {
+        running=true; result=null; failure=null; selfTestReport=null; reportCopied=false
+        try {
+         val probe=withContext(Dispatchers.Default) {
+          OcrSelfTest.run(this@MainActivity)
+         }
+         result=probe.recognized
+         selfTestReport=probe.diagnostic
+        } catch(e:Exception) { failure=e.message ?: e.javaClass.simpleName }
+        finally { running=false }
+       }
+      }) { Text(stringResource(R.string.run_self_test)) }
+      Button(enabled=!running, onClick={
        picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
       }) { Text(stringResource(R.string.pick_photo)) }
       if (running) {
@@ -59,6 +77,17 @@ class MainActivity: ComponentActivity() {
       }
       failure?.let { Text(stringResource(R.string.error_prefix,it),
        color=MaterialTheme.colorScheme.error) }
+      selfTestReport?.let { report ->
+       HorizontalDivider()
+       Text(stringResource(R.string.self_test_result),style=MaterialTheme.typography.titleMedium)
+       Text(report)
+       Button(onClick={
+        val clipboard=getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("FairPrice synthetic OCR report",report))
+        reportCopied=true
+       }) { Text(stringResource(R.string.copy_report)) }
+       if(reportCopied) Text(stringResource(R.string.report_copied))
+      }
       result?.let { ocr ->
        Text(stringResource(R.string.ocr_confidence,ocr.meanConfidence))
        Text(stringResource(R.string.ocr_elapsed,ocr.elapsedMs))
