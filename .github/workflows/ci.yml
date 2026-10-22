@@ -29,6 +29,39 @@ jobs:
         run: ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug --no-daemon
       - name: OCR corpus evaluator unit tests
         run: python3 -m unittest discover -s tools -p 'test_*.py' -v
+      - name: Verify packaged APK is offline and contains pinned ARM64 OCR model
+        run: |
+          set -euo pipefail
+          apk="app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$apk"
+          sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          aapt="$(find "$sdk_root/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          test -x "$aapt"
+          permissions="$("$aapt" dump permissions "$apk")"
+          if grep -Fq 'android.permission.INTERNET' <<< "$permissions"; then
+            echo "ERROR: packaged FairPrice requests INTERNET permission"
+            exit 1
+          fi
+          expected="e16e5e036cce1d9ec2b00063cf8b54472625b9e14d893a169e2b0dedeb4df225"
+          actual="$(unzip -p "$apk" assets/ocr/rus.traineddata | sha256sum | awk '{print $1}')"
+          if [[ "$actual" != "$expected" ]]; then
+            echo "ERROR: packaged OCR traineddata missing or hash mismatch"
+            exit 1
+          fi
+          native="$(unzip -Z1 "$apk" | grep '^lib/' || true)"
+          if ! grep -q '^lib/arm64-v8a/libtesseract.so
+        with:
+          name: fairprice-ocr-prototype-debug
+          path: app/build/outputs/apk/debug/*.apk
+ <<< "$native"; then
+            echo "ERROR: arm64-v8a native Tesseract library missing from APK"
+            exit 1
+          fi
+          if grep -Eq '^lib/(x86|x86_64|armeabi-v7a)/' <<< "$native"; then
+            echo "ERROR: unexpected extra native ABI packaged"
+            exit 1
+          fi
+          echo "PASS: APK offline permission, OCR model SHA-256 and native ABI"
       - uses: actions/upload-artifact@v4
         with:
           name: fairprice-ocr-prototype-debug
