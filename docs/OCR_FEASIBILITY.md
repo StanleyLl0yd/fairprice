@@ -1,14 +1,20 @@
-# FairPrice: OCR feasibility checkpoint
-Date 2026-10-22. Stage 0: OPEN. NOT a release candidate.
+# OCR feasibility - 2026-10-22
 
-Locally executed before source upload: Kotlin parser/desktop OCR 18/18 PASS,
-including 5 synthetic price-label pictures with Tesseract Russian recognition.
-These are NOT real store photos, NOT Android benchmarks or accuracy claims.
+Status: Stage 0 OPEN, not a release candidate.
 
-Not yet verified: Android arm64 compilation, JNI execution, bounding boxes,
-CPU performance, ABI/16-KB alignment, app storage, >=100 real Russian price
-labels, model comparison vs PaddleOCR PP-OCRv5, and reproducible AAB output.
+Completed:
+- Kotlin parser and desktop Tesseract: locally 18/18 synthetic smoke/integration cases PASS.
+- Native Android Debug APK assembled, unit tests and Android Lint succeeded in GitHub Actions at PR #1.
+- Russian model provided with SHA-256 verified build-time download, bundled into APK.
+- Offline/permissions baseline: source manifest has no INTERNET permission.
 
-Targets for readable real labels: price >=98%; quantity >=95%.
-Do not silently accept multiple prices or card-only prices.
-No telemetry, no backend, no network permission in Android manifest.
+Not verified:
+- Actual OCR on arm64 Android, JNI operation, bounding-box accuracy, performance or memory.
+- Full PP-OCRv5 ncnn Android pipeline, its model provenance and ABI compatibility.
+- >=100 legally sourced genuine Russian price-tag photographs and precision/recall metrics.
+- Final APK/AAB release acceptance.
+
+A synthetic on-device smoke test was added but has not been run on physical Android hardware.
+Any assertion about production OCR quality would therefore be premature.
+
+Upstream reference: https://github.com/Tenshi18/DroidOCR

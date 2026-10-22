@@ -1,11 +1,37 @@
 # FairPrice
 
-Offline Android application for comparing real unit prices from Russian retail price labels. Kotlin, Jetpack Compose Material 3, fully offline Cyrillic OCR.
+Small offline Android utility to compare real unit prices from Russian shelf labels and packaging photographs.
 
-**Current stage: OCR feasibility prototype (not release-ready).** The intended device workflow is capture/select an image, detect Russian text and prices, verify recognized values, and compare per kg/litre/item. No accounts, backend, telemetry or INTERNET permission are planned for v1.
+**Status: Stage 0 - Android OCR feasibility / NOT RELEASE READY.** No publication is authorized.
 
-The initial source import and Android CI validation are in progress. The OCR engine is not considered accepted until actual Android arm64 tests and real price-tag benchmarks are completed.
+- Package: `com.sl.fairprice`; Kotlin / Compose Material 3 / Android API 26+.
+- Gradle 9.5.1; AGP 9.3.1; Kotlin Compose compiler 2.4.20; CI JDK 25; JVM bytecode 17.
+- Target SDK 36; compile SDK 37.0.
+- Baseline Russian OCR: Tesseract4Android 4.9.0 plus bundled Cyrillic `tessdata_fast` model.
+- Alternative OCR under investigation: PP-OCRv5 East-Slavic plus ncnn.
+- The app has no INTERNET permission, account, backend, advertising or analytics.
+- Photo Picker only. No broad gallery permission.
 
-Application ID: `com.sl.fairprice`. Min Android API 26. RuStore first; publication requires separate authorization.
+## Build
 
-Third-party OCR assets will retain their own license notices. Project license not chosen yet.
+Run `bash tools/fetch-ocr-model.sh` once on a networked development machine to obtain the pinned OCR model. The script verifies SHA-256 and fails closed if upstream data differs. This is a **build-time** operation only; the packaged app and OCR work offline.
+
+Run `./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug` (Windows: `gradlew.bat`).
+
+The APK is available from the successful GitHub Actions build artifact. It is a technical preview, not an accepted release.
+
+## Actual Android device OCR smoke test
+
+Connect an Android arm64-v8a device with USB debugging enabled, then execute:
+
+```sh
+./gradlew :app:connectedDebugAndroidTest
+```
+
+The instrumented test generates a deliberately synthetic Cyrillic price label in memory, checks local Russian OCR and bounding boxes, and verifies there is no INTERNET permission. This test has **not yet been executed on physical hardware**. A successful Android build alone does not prove JNI runtime or on-device performance.
+
+## Release blockers
+
+Stage 0 requires verified on-device OCR, a fair comparison against PaddleOCR, third-party licensing and ABI checks, and quality evaluation against at least 100 **real** Russian store labels. Target extraction accuracy is >=98% for readable prices and >=95% for quantities. Do not silently accept ambiguous prices.
+
+Stage 1-4 (math, UI comparison, camera, real-photo release testing) are not accepted. Project license has not been selected. RuStore publication requires separate authorization.
