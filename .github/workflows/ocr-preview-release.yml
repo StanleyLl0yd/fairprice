@@ -1,0 +1,114 @@
+name: Publish FairPrice OCR preview
+on:
+  workflow_run:
+    workflows: ["Android OCR prototype"]
+    types: [completed]
+permissions:
+  contents: write
+concurrency:
+  group: fairprice-ocr-preview-v0.0.1
+  cancel-in-progress: false
+jobs:
+  preview:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    name: Build and publish tested arm64 APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact tested commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - name: Verify main and release tag before building
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          current="$(git ls-remote origin refs/heads/main | cut -f1)"
+          if [[ "$current" != "$TESTED_SHA" ]]; then
+            echo "Main moved since CI; skip stale release"
+            exit 0
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v0.0.1-ocr-preview.1" >/dev/null 2>&1; then
+            echo "Preview already tagged; do not replace release assets"
+            exit 0
+          fi
+          echo 'PUBLISH_ALLOWED=1' >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v4
+        if: env.PUBLISH_ALLOWED == '1'
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Android SDK 37
+        if: env.PUBLISH_ALLOWED == '1'
+        run: |
+          set -euo pipefail
+          sdk_mgr="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n1)"
+          test -n "$sdk_mgr"
+          "$sdk_mgr" --sdk_root="$ANDROID_HOME" 'platforms;android-37.0' 'build-tools;36.0.0'
+      - name: Fetch pinned offline Russian model
+        if: env.PUBLISH_ALLOWED == '1'
+        run: bash tools/fetch-ocr-model.sh
+      - uses: gradle/actions/setup-gradle@v4
+        if: env.PUBLISH_ALLOWED == '1'
+      - name: Build and run Android unit tests + lint
+        if: env.PUBLISH_ALLOWED == '1'
+        run: ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --no-daemon
+      - name: Verify offline APK and produce SHA256
+        if: env.PUBLISH_ALLOWED == '1'
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          apk=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions "$apk" > release-assets/permissions.txt
+          if grep -q 'android.permission.INTERNET' release-assets/permissions.txt; then
+            echo 'Unexpected network permission'; exit 1
+          fi
+          expected=e16e5e036cce1d9ec2b00063cf8b54472625b9e14d893a169e2b0dedeb4df225
+          actual="$(unzip -p "$apk" assets/ocr/rus.traineddata | sha256sum | cut -d' ' -f1)"
+          test "$actual" = "$expected"
+          unzip -Z1 "$apk" | grep -Fx 'lib/arm64-v8a/libtesseract.so'
+          if unzip -Z1 "$apk" | grep -Eq '^lib/(x86|x86_64|armeabi-v7a)/'; then
+            echo 'Unexpected native architecture'; exit 1
+          fi
+          cp "$apk" release-assets/FairPrice-0.0.1-ocr-preview.1-arm64.apk
+          ( cd release-assets && sha256sum FairPrice-0.0.1-ocr-preview.1-arm64.apk > FairPrice-0.0.1-ocr-preview.1-arm64.apk.sha256 )
+          rm release-assets/permissions.txt
+      - name: Create GitHub prerelease
+        if: env.PUBLISH_ALLOWED == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$TESTED_SHA"
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v0.0.1-ocr-preview.1" >/dev/null 2>&1; then
+            echo 'Tag appeared concurrently'; exit 1
+          fi
+          cat > release-notes.md <<EON
+          **FairPrice OCR technical preview - not FairPrice 1.0.**
+
+          Source: $TESTED_SHA, CI-verified; Android 8+, arm64-v8a.
+
+          - Offline Russian OCR of selected price-tag images.
+          - Built-in synthetic OCR self-test with copyable diagnostics.
+          - No INTERNET permission; no photo uploads or analytics.
+          - Photo Picker only; no CameraX or finished product-comparison UI yet.
+          - **Debug-signed APK for testing**, not for production or RuStore.
+          - Native ARM64 CPU and >=100 real price-tag accuracy remain unverified.
+
+          Read [test instructions](https://github.com/$GITHUB_REPOSITORY/blob/$TESTED_SHA/docs/TEST_RELEASE.md).
+          EON
+          gh release create v0.0.1-ocr-preview.1 \
+            release-assets/FairPrice-0.0.1-ocr-preview.1-arm64.apk \
+            release-assets/FairPrice-0.0.1-ocr-preview.1-arm64.apk.sha256 \
+            --repo "$GITHUB_REPOSITORY" --target "$TESTED_SHA" \
+            --title 'FairPrice 0.0.1 - offline OCR preview (test only)' \
+            --notes-file release-notes.md --prerelease
