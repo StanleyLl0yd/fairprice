@@ -46,6 +46,13 @@
  <string name="source_normal">Цена товара</string>
  <string name="word_bounds">Координаты текстовых областей</string>
  <string name="empty_text">Текст не распознан</string>
+ <string name="history_title">История сравнений</string>
+ <string name="history_description">Сохраняются только подтверждённые цены и количества. Фотографии и распознанный текст не сохраняются. Максимум 50 записей, только на устройстве.</string>
+ <string name="history_save">Сохранить сравнение</string>
+ <string name="history_empty">История пока пуста.</string>
+ <string name="history_offer_pair">%1$s ₽ за %2$s / %5$s и %3$s ₽ за %4$s / %5$s</string>
+ <string name="history_restore">Вернуть для сравнения</string>
+ <string name="history_delete">Удалить</string>
  <string name="camera_title">Сфотографировать ценник</string>
  <string name="camera_capture">Снять ценник</string>
  <string name="camera_cancel">Отмена</string>

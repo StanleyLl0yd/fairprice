@@ -20,6 +20,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -30,6 +31,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.sl.fairprice.camera.OcrImageLoader
+import com.sl.fairprice.history.ComparisonHistory
+import com.sl.fairprice.history.SavedComparison
+import com.sl.fairprice.pricing.PriceEntry
+import com.sl.fairprice.ui.HistorySection
 import com.sl.fairprice.ocr.OcrSelfTest
 import com.sl.fairprice.ocr.TesseractOfflineOcr
 import com.sl.fairprice.parser.PriceKind
@@ -52,6 +57,15 @@ class MainActivity : ComponentActivity() {
                 var failure by remember { mutableStateOf<String?>(null) }
                 var selfTestReport by remember { mutableStateOf<String?>(null) }
                 var reportCopied by remember { mutableStateOf(false) }
+                var historyRows by remember { mutableStateOf<List<SavedComparison>>(emptyList()) }
+                val historyDb = remember { ComparisonHistory(applicationContext) }
+                LaunchedEffect(Unit) {
+                    try {
+                        historyRows = withContext(Dispatchers.IO) { historyDb.list() }
+                    } catch (e: Exception) {
+                        failure = e.message ?: e.javaClass.simpleName
+                    }
+                }
 
                 val picker = rememberLauncherForActivityResult(
                     ActivityResultContracts.PickVisualMedia()
@@ -123,6 +137,53 @@ class MainActivity : ComponentActivity() {
                             onPhoto = { index ->
                                 photoTarget = index
                                 picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            }
+                        )
+                        val offerA = PriceEntry.offer(offers[0].price, offers[0].quantity, offers[0].measure)
+                        val offerB = PriceEntry.offer(offers[1].price, offers[1].quantity, offers[1].measure)
+                        HistorySection(
+                            rows = historyRows,
+                            canSave = offerA != null && offerB != null &&
+                                offerA.measure == offerB.measure && offers.all { it.confirmed },
+                            busy = busy,
+                            onSave = {
+                                val a = offerA
+                                val b = offerB
+                                if (a != null && b != null && offers.all { it.confirmed } &&
+                                    a.measure == b.measure) {
+                                    scope.launch {
+                                        try {
+                                            historyRows = withContext(Dispatchers.IO) {
+                                                historyDb.save(a, b)
+                                                historyDb.list()
+                                            }
+                                        } catch (e: Exception) {
+                                            failure = e.message ?: e.javaClass.simpleName
+                                        }
+                                    }
+                                }
+                            },
+                            onRestore = { row ->
+                                offers = listOf(row.first, row.second).map { product ->
+                                    OfferDraft(
+                                        price = product.priceRub.toPlainString(),
+                                        quantity = product.quantity.toPlainString(),
+                                        measure = product.measure,
+                                        confirmed = false
+                                    )
+                                }
+                            },
+                            onDelete = { id ->
+                                scope.launch {
+                                    try {
+                                        historyRows = withContext(Dispatchers.IO) {
+                                            historyDb.delete(id)
+                                            historyDb.list()
+                                        }
+                                    } catch (e: Exception) {
+                                        failure = e.message ?: e.javaClass.simpleName
+                                    }
+                                }
                             }
                         )
                         if (busy) {
