@@ -1,0 +1,20 @@
+<resources>
+ <string name="app_name">FairPrice</string>
+ <string name="probe_subtitle">Offline Russian price-label OCR prototype</string>
+ <string name="pick_photo">Choose a photo</string>
+ <string name="processing">Recognizing…</string>
+ <string name="price_candidates">Price candidates</string>
+ <string name="quantity_candidates">Quantity candidates</string>
+ <string name="ocr_result">Recognized text</string>
+ <string name="ocr_confidence">OCR confidence: %1$d%%</string>
+ <string name="ocr_elapsed">Recognition: %1$d ms</string>
+ <string name="error_prefix">Error: %1$s</string>
+ <string name="no_prices">No confirmed prices detected</string>
+ <string name="no_quantity">No mass, volume or count detected</string>
+ <string name="needs_review">Verify recognized values before calculating.</string>
+ <string name="source_reference">Reference unit price (not package price)</string>
+ <string name="source_card">Loyalty-card price</string>
+ <string name="source_normal">Product price</string>
+ <string name="word_bounds">Text region coordinates</string>
+ <string name="empty_text">No text recognized</string>
+</resources>

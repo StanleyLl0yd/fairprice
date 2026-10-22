@@ -1,0 +1,20 @@
+<resources>
+ <string name="app_name">FairPrice</string>
+ <string name="probe_subtitle">Локальный прототип OCR: русский ценник</string>
+ <string name="pick_photo">Выбрать фотографию</string>
+ <string name="processing">Распознавание…</string>
+ <string name="price_candidates">Кандидаты цены</string>
+ <string name="quantity_candidates">Кандидаты количества</string>
+ <string name="ocr_result">Распознанный текст</string>
+ <string name="ocr_confidence">Уверенность OCR: %1$d%%</string>
+ <string name="ocr_elapsed">Распознавание: %1$d мс</string>
+ <string name="error_prefix">Ошибка: %1$s</string>
+ <string name="no_prices">Подтверждённые цены не обнаружены</string>
+ <string name="no_quantity">Не найдена масса, объём или количество</string>
+ <string name="needs_review">Проверьте распознанные данные перед расчётом.</string>
+ <string name="source_reference">Цена за единицу (не за упаковку)</string>
+ <string name="source_card">Цена по карте</string>
+ <string name="source_normal">Цена товара</string>
+ <string name="word_bounds">Координаты текстовых областей</string>
+ <string name="empty_text">Текст не распознан</string>
+</resources>
