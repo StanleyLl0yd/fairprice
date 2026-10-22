@@ -24,7 +24,7 @@ class EvaluationTests(unittest.TestCase):
             "quantity": "900"
         }) + "\n")
         predictions.write_text(json.dumps({
-            "id": "test", "price_rub": "129,99", "measure": "ml", "quantity": "900"
+            "id": "test", "price_rub": "129,99", "measure": "ml", "quantity": "900", "ambiguous": False
         }) + "\n")
         return truth, predictions, photos
 
@@ -54,6 +54,49 @@ class EvaluationTests(unittest.TestCase):
             self.assertEqual(result["ambiguous"], 1)
             self.assertFalse(result["accepted"])
             self.assertEqual(result["quantity_applicable"], 1)
+
+    def test_invalid_prediction_is_counted_as_model_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            t, p, photos = self.fixture(tmp)
+            p.write_text(json.dumps({
+                "id": "test", "price_rub": "NaN", "quantity": "-1",
+                "measure": "ml", "ambiguous": False
+            }) + "\n")
+            result = evaluate(t, p, photos, minimum=1)
+            self.assertEqual(result["price_correct"], 0)
+            self.assertEqual(result["quantity_correct"], 0)
+            self.assertFalse(result["accepted"])
+
+    def test_missing_ambiguity_flag_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            t, p, photos = self.fixture(tmp)
+            p.write_text(json.dumps({
+                "id": "test", "price_rub": "129.99",
+                "quantity": "900", "measure": "ml"
+            }) + "\n")
+            with self.assertRaisesRegex(ValueError, "must state ambiguous"):
+                evaluate(t, p, photos, minimum=1)
+
+    def test_many_unreadable_samples_cannot_inflate_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            t, p, photos = self.fixture(tmp)
+            gt = [json.loads(t.read_text().strip())]
+            predictions = [json.loads(p.read_text().strip())]
+            for i in range(99):
+                image = photos / ("extra-%03d.jpg" % i)
+                image.write_bytes(("synthetic sample %d" % i).encode())
+                gt.append({
+                    "id": "extra-%03d" % i, "image": image.name,
+                    "sha256": hashlib.sha256(image.read_bytes()).hexdigest(),
+                    "real_photo": True,
+                    "source_description": "synthetic test only",
+                    "readable": False
+                })
+                predictions.append({"id": "extra-%03d" % i, "ambiguous": True})
+            t.write_text("".join(json.dumps(v) + "\n" for v in gt))
+            p.write_text("".join(json.dumps(v) + "\n" for v in predictions))
+            with self.assertRaisesRegex(ValueError, "Insufficient readable real photos"):
+                evaluate(t, p, photos, minimum=100)
 
     def test_missing_file_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
