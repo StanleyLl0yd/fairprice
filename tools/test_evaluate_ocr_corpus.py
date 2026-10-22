@@ -61,7 +61,7 @@ class EvaluationTests(unittest.TestCase):
             p.write_text(json.dumps({
                 "id": "test", "price_rub": "NaN", "quantity": "-1",
                 "measure": "ml", "ambiguous": False
-            }) + "\\n")
+            }) + "\n")
             result = evaluate(t, p, photos, minimum=1)
             self.assertEqual(result["price_correct"], 0)
             self.assertEqual(result["quantity_correct"], 0)
@@ -73,7 +73,7 @@ class EvaluationTests(unittest.TestCase):
             p.write_text(json.dumps({
                 "id": "test", "price_rub": "129.99",
                 "quantity": "900", "measure": "ml"
-            }) + "\\n")
+            }) + "\n")
             with self.assertRaisesRegex(ValueError, "must state ambiguous"):
                 evaluate(t, p, photos, minimum=1)
 
@@ -93,8 +93,8 @@ class EvaluationTests(unittest.TestCase):
                     "readable": False
                 })
                 predictions.append({"id": "extra-%03d" % i, "ambiguous": True})
-            t.write_text("".join(json.dumps(v) + "\\n" for v in gt))
-            p.write_text("".join(json.dumps(v) + "\\n" for v in predictions))
+            t.write_text("".join(json.dumps(v) + "\n" for v in gt))
+            p.write_text("".join(json.dumps(v) + "\n" for v in predictions))
             with self.assertRaisesRegex(ValueError, "Insufficient readable real photos"):
                 evaluate(t, p, photos, minimum=100)
 
