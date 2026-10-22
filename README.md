@@ -30,6 +30,22 @@ Connect an Android arm64-v8a device with USB debugging enabled, then execute:
 
 The instrumented test generates a deliberately synthetic Cyrillic price label in memory, checks local Russian OCR and bounding boxes, and verifies there is no INTERNET permission. This test has **not yet been executed on physical hardware**. A successful Android build alone does not prove JNI runtime or on-device performance.
 
+## Stage 0 verification snapshot
+
+- Parser hardening: PR #3 merged with Kotlin regression coverage.
+- Image capture input: Photo Picker decodes bounded bitmaps and honors EXIF
+  rotation/reflection (PR #7, instrumentation compiled but not executed).
+- Build: Linux/macOS model hash verification (PR #8); Android debug unit
+  tests and Lint PASS on GitHub Actions.
+- Real-price-tag evaluation: `tools/evaluate_ocr_corpus.py`, documented
+  in `docs/OCR_CORPUS.md`. No 100-photo corpus has been scored.
+- ARM64 Android emulator test on GitHub's hosted macOS Apple Silicon
+  runner failed **before OCR** because Hypervisor.framework reported
+  `HV_UNSUPPORTED`; PR #4 closed unmerged. The blocker is in issue #5.
+
+See `docs/OCR_FEASIBILITY.md` for precise evidence and incomplete gates.
+No Android-on-device OCR benchmark or release approval is implied.
+
 ## Release blockers
 
 Stage 0 requires verified on-device OCR, a fair comparison against PaddleOCR, third-party licensing and ABI checks, and quality evaluation against at least 100 **real** Russian store labels. Target extraction accuracy is >=98% for readable prices and >=95% for quantities. Do not silently accept ambiguous prices.
