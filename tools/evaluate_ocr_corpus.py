@@ -27,6 +27,14 @@ def amount(value):
     return number
 
 
+def predicted_amount(value):
+    """Malformed/missing OCR output is a failed extraction, not bad ground truth."""
+    try:
+        return amount(value)
+    except ValueError:
+        return None
+
+
 def records(path):
     result = {}
     for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
@@ -93,22 +101,26 @@ def evaluate(manifest, predictions, photos, minimum=100):
                 raise ValueError(f"{key}: missing annotated quantity")
             qty_total += 1
         observed = predicted[key]
-        if observed.get("ambiguous") is True:
+        if type(observed.get("ambiguous")) is not bool:
+            raise ValueError(f"{key}: prediction must state ambiguous as true/false")
+        if observed["ambiguous"] is True:
             ambiguous += 1
             failures.add(key)
             continue
-        if amount(observed.get("price_rub")) == expected_price:
+        if predicted_amount(observed.get("price_rub")) == expected_price:
             price_ok += 1
         else:
             failures.add(key)
         if expected_unit:
             if (observed.get("measure") == expected_unit and
-                    amount(observed.get("quantity")) == expected_qty):
+                    predicted_amount(observed.get("quantity")) == expected_qty):
                 qty_ok += 1
             else:
                 failures.add(key)
-    if not readable or not qty_total:
-        raise ValueError("No readable images with price and quantity annotations")
+    if readable < minimum:
+        raise ValueError(f"Insufficient readable real photos: {readable} < {minimum}")
+    if not qty_total:
+        raise ValueError("No readable images with quantity annotations")
     price_accuracy = price_ok / readable
     quantity_accuracy = qty_ok / qty_total
     return {
