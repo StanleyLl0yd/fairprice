@@ -20,31 +20,37 @@ Run `./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug` (Window
 
 The APK is available from the successful GitHub Actions build artifact. It is a technical preview, not an accepted release.
 
-## Actual Android device OCR smoke test
+## Verified Android OCR runs (Stage 0, not release acceptance)
 
-Connect an Android arm64-v8a device with USB debugging enabled, then execute:
+- **Android 11, x86_64 emulator:** PR #11 ran 5/5 real instrumentation
+  tests on a KVM-backed Android emulator. Local Cyrillic Tesseract JNI,
+  text-area bounds, EXIF handling and lack of INTERNET permission PASS.
+- **Android 15, ARM64 native bridge:** PR #14 ran 5/5 Android tests using
+  the **standard arm64-v8a APK**, with ARM64 library translation on an
+  x86_64 host. This confirms execution of the ARM64 native library via
+  translation, **not** on physical ARM64 silicon.
+- **APK security:** PR #10 verifies the built APK contains only the expected
+  arm64-v8a native OCR library, the pinned Russian OCR model SHA-256, and
+  no INTERNET permission after manifest merging.
+- **Corpus exporter:** PR #13 provides an optional Android instrumentation
+  benchmark exporter to offline JSONL, documented in
+  `docs/DEVICE_OCR_BENCHMARK.md`. Without explicitly staged real photos,
+  that particular test is skipped, not counted as accuracy evidence.
+- **OCR corpus acceptance:** `tools/evaluate_ocr_corpus.py`, hardened in
+  PR #12, requires 100 **readable genuine** price-label photos and enforces
+  price >=98% and quantity >=95% extraction success. No genuine-photo
+  benchmark has been scored yet.
+
+For an ARM64 physical device with USB debugging, run:
 
 ```sh
+bash tools/fetch-ocr-model.sh
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
-The instrumented test generates a deliberately synthetic Cyrillic price label in memory, checks local Russian OCR and bounding boxes, and verifies there is no INTERNET permission. This test has **not yet been executed on physical hardware**. A successful Android build alone does not prove JNI runtime or on-device performance.
-
-## Stage 0 verification snapshot
-
-- Parser hardening: PR #3 merged with Kotlin regression coverage.
-- Image capture input: Photo Picker decodes bounded bitmaps and honors EXIF
-  rotation/reflection (PR #7, instrumentation compiled but not executed).
-- Build: Linux/macOS model hash verification (PR #8); Android debug unit
-  tests and Lint PASS on GitHub Actions.
-- Real-price-tag evaluation: `tools/evaluate_ocr_corpus.py`, documented
-  in `docs/OCR_CORPUS.md`. No 100-photo corpus has been scored.
-- ARM64 Android emulator test on GitHub's hosted macOS Apple Silicon
-  runner failed **before OCR** because Hypervisor.framework reported
-  `HV_UNSUPPORTED`; PR #4 closed unmerged. The blocker is in issue #5.
-
-See `docs/OCR_FEASIBILITY.md` for precise evidence and incomplete gates.
-No Android-on-device OCR benchmark or release approval is implied.
+This remains a pending physical-device gate. See
+`docs/OCR_FEASIBILITY.md` and issue #5 for test links, limitations and
+PaddleOCR candidate feasibility status.
 
 ## Release blockers
 
