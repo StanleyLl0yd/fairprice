@@ -95,7 +95,7 @@ class UnitPriceCalculatorTest {
     }
 
     @Test fun roundingUsesHalfUpRubleKopecks() {
-        assertEquals(BigDecimal("0.34"), UnitPriceCalculator.quote(offer("1", "3", Measure.PIECE)).rub)
+        assertEquals(BigDecimal("0.13"), UnitPriceCalculator.quote(offer("1", "8", Measure.PIECE)).rub)
         assertEquals(BigDecimal("333.33"), UnitPriceCalculator.quote(offer("1", "3", Measure.GRAM)).rub)
     }
 }
