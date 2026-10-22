@@ -1,0 +1,185 @@
+name: Signed FairPrice beta
+on:
+  workflow_run:
+    workflows: ["Android OCR prototype"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: fairprice-signed-v0-1-0-beta-1
+  cancel-in-progress: false
+
+jobs:
+  signed-preview:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    name: Build signed arm64 APK and AAB
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment: android-signing
+    steps:
+      - name: Checkout trusted protected main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Verify source CI and immutable target
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          VERIFIED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          head="$(git rev-parse HEAD)"
+          main="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          test "$head" = "$main" || { echo "Main moved during checkout"; exit 1; }
+          if [[ "$EVENT_NAME" == 'workflow_run' ]]; then
+            test "$head" = "$VERIFIED_SHA" || { echo "CI verified an older commit"; exit 1; }
+          else
+            gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml \
+              --branch main --limit 30 --json headSha,conclusion \
+              --jq ".[] | select(.headSha == \"$head\" and .conclusion == \"success\") | .headSha" \
+              | grep -Fx "$head" || { echo "No successful exact-main CI"; exit 1; }
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v0.1.0-beta.1" >/dev/null 2>&1; then
+            echo "Signed preview tag already exists; refusing to replace the release"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+          echo "SOURCE_SHA=$head" >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v4
+        if: steps.gate.outputs.publish == 'true'
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Install Android SDK
+        if: steps.gate.outputs.publish == 'true'
+        run: |
+          set -euo pipefail
+          manager="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n1)"
+          test -n "$manager"
+          "$manager" --sdk_root="$ANDROID_HOME" 'platforms;android-37.0' 'build-tools;36.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.gate.outputs.publish == 'true'
+      - name: Verify and stage local-release signing key
+        if: steps.gate.outputs.publish == 'true'
+        env:
+          FP_SIGNING_KEYSTORE_B64: ${{ secrets.FP_SIGNING_KEYSTORE_B64 }}
+          FP_SIGNING_STORE_PASSWORD: ${{ secrets.FP_SIGNING_STORE_PASSWORD }}
+          FP_SIGNING_KEY_ALIAS: ${{ secrets.FP_SIGNING_KEY_ALIAS }}
+          FP_SIGNING_KEY_PASSWORD: ${{ secrets.FP_SIGNING_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$FP_SIGNING_KEYSTORE_B64" || { echo "Missing keystore environment secret"; exit 1; }
+          test -n "$FP_SIGNING_STORE_PASSWORD" || { echo "Missing store password secret"; exit 1; }
+          test -n "$FP_SIGNING_KEY_ALIAS" || { echo "Missing key alias secret"; exit 1; }
+          test -n "$FP_SIGNING_KEY_PASSWORD" || { echo "Missing key password secret"; exit 1; }
+          path="$RUNNER_TEMP/fairprice-signing"
+          mkdir -p "$path"
+          printf '%s' "$FP_SIGNING_KEYSTORE_B64" | base64 --decode > "$path/upload.jks"
+          test -s "$path/upload.jks"
+          echo "FP_SIGNING_STORE_FILE=$path/upload.jks" >> "$GITHUB_ENV"
+      - name: Obtain checksum-pinned offline OCR model
+        if: steps.gate.outputs.publish == 'true'
+        run: bash tools/fetch-ocr-model.sh
+      - name: Build signed APK/AAB and run tests
+        if: steps.gate.outputs.publish == 'true'
+        env:
+          FP_SIGNING_STORE_PASSWORD: ${{ secrets.FP_SIGNING_STORE_PASSWORD }}
+          FP_SIGNING_KEY_ALIAS: ${{ secrets.FP_SIGNING_KEY_ALIAS }}
+          FP_SIGNING_KEY_PASSWORD: ${{ secrets.FP_SIGNING_KEY_PASSWORD }}
+        run: |
+          ./gradlew -Pfairprice.signedPreview=true \
+            :app:assembleRelease :app:bundleRelease \
+            :app:testDebugUnitTest :app:lintRelease --no-daemon
+      - name: Verify signature, ABI, model and package
+        if: steps.gate.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          apk="app/build/outputs/apk/release/app-release.apk"
+          aab="app/build/outputs/bundle/release/app-release.aab"
+          test -s "$apk" && test -s "$aab"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify \
+            --min-sdk-version 26 --verbose --print-certs "$apk" \
+            > release-assets/certificate-report.txt
+          grep -Fq 'Signer #1 certificate SHA-256 digest:' release-assets/certificate-report.txt
+          mkdir -p "$RUNNER_TEMP/previous-signing-certificate"
+          gh release download v0.0.2-comparison-preview.3 --repo "$GITHUB_REPOSITORY" \
+            --pattern certificate-report.txt --dir "$RUNNER_TEMP/previous-signing-certificate"
+          old_cert="$(grep -m1 'Signer #1 certificate SHA-256 digest:' "$RUNNER_TEMP/previous-signing-certificate/certificate-report.txt" | awk '{print $NF}')"
+          new_cert="$(grep -m1 'Signer #1 certificate SHA-256 digest:' release-assets/certificate-report.txt | awk '{print $NF}')"
+          test -n "$old_cert" && test -n "$new_cert" && test "$old_cert" = "$new_cert" || {
+            echo 'Signing certificate differs from previous signed release'; exit 1;
+          }
+          echo 'PASS: signed by exactly the same certificate as comparison preview.3'
+          info="$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk")"
+          grep -Fq "name='com.sl.fairprice'" <<< "$info"
+          grep -Fq "versionCode='4'" <<< "$info"
+          if "$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions "$apk" \
+            | grep -Fq 'android.permission.INTERNET'; then
+            echo "Unexpected INTERNET permission"; exit 1
+          fi
+          expected=e16e5e036cce1d9ec2b00063cf8b54472625b9e14d893a169e2b0dedeb4df225
+          actual="$(unzip -p "$apk" assets/ocr/rus.traineddata | sha256sum | cut -d' ' -f1)"
+          test "$actual" = "$expected"
+          unzip -Z1 "$apk" | grep -Fx 'lib/arm64-v8a/libtesseract.so'
+          if unzip -Z1 "$apk" | grep -Eq '^lib/(x86|x86_64|armeabi-v7a)/'; then
+            echo "Unexpected native architecture"; exit 1
+          fi
+          cp "$apk" release-assets/FairPrice-0.1.0-beta.1-signed-arm64.apk
+          cp "$aab" release-assets/FairPrice-0.1.0-beta.1-signed.aab
+          (cd release-assets && sha256sum *.apk *.aab > SHA256SUMS.txt)
+      - name: Publish signed prerelease
+        if: steps.gate.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          now="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          test "$now" = "$SOURCE_SHA" || { echo "Main advanced"; exit 1; }
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v0.1.0-beta.1" >/dev/null 2>&1; then
+            echo "Tag appeared concurrently; refusing mutation"; exit 1
+          fi
+          cat > release-notes.md <<EOF
+          # FairPrice 0.1.0 Beta 1 - offline camera and comparison
+          
+          This is **not FairPrice 1.0**, nor an app-store publication.
+          Verified source commit: $SOURCE_SHA
+          
+          - Signed with the same existing private GitHub Environment key as v0.0.2-comparison-preview.3; certificate fingerprint verified against that immutable release.
+          - Android 8.0+; arm64-v8a APK. An AAB is provided for signing verification, not store deployment.
+          - Manual two-offer exact per kg/litre/piece comparison and local history.
+          - Offline Russian OCR from Photo Picker or CameraX, always requiring user confirmation.
+          - Camera JPEG is temporary and deleted after OCR; no history photos.
+          - Built-in Cyrillic OCR self-test with copyable diagnostics.
+          - No INTERNET permission; SHA-256 of bundled Russian model verified.
+          - Physical native ARM64 and 100-real-photo quality acceptance still pending.
+          - Updates signed preview.3 **in place**. Debug-signed preview.1 must be uninstalled first.
+          
+          See the public certificate digest in certificate-report.txt. Never share keystore or passwords.
+          EOF
+          gh release create v0.1.0-beta.1 \
+            release-assets/FairPrice-0.1.0-beta.1-signed-arm64.apk \
+            release-assets/FairPrice-0.1.0-beta.1-signed.aab \
+            release-assets/SHA256SUMS.txt \
+            release-assets/certificate-report.txt \
+            --repo "$GITHUB_REPOSITORY" --target "$SOURCE_SHA" \
+            --title 'FairPrice 0.1.0 Beta 1 - signed offline unit-price comparison' \
+            --notes-file release-notes.md --prerelease
+      - name: Delete private signing keystore
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/fairprice-signing"
