@@ -7,5 +7,10 @@ local.properties
 *.apk
 *.aab
 *.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
 .DS_Store
 app/src/main/assets/ocr/*.traineddata
