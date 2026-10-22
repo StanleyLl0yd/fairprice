@@ -1,8 +1,10 @@
 # Stage 0 real-photo OCR accuracy corpus
 
 This is **not** an existing benchmark and no real photographed samples have
-been scored yet. Use at least 100 independently annotated, legally obtained
+been scored yet. Use at least 100 **readable**, independently annotated, legally obtained
 **genuine Russian store price-label photographs from different shops**.
+Additional unreadable images may be included, but never count toward the
+100-photo acceptance minimum.
 Store the photos and annotations privately/offline; do not commit private photos
 to GitHub. Human curation must verify that a photo is real (a filename, a
 boolean assertion and SHA-256 cannot prove photographic authenticity).
@@ -20,11 +22,14 @@ from the **actual OCR+parser under test**:
 
 If OCR cannot choose safely, set `ambiguous:true` and omit the numeric fields.
 A missed or ambiguous value counts as extraction failure; it must not be
-silently credited as correct. Units must be normalized to `g`, `ml` or
+silently credited as correct. The `ambiguous` boolean is mandatory for every
+prediction; a malformed OCR numeric value counts as a failed extraction rather
+than invalid ground truth. Units must be normalized to `g`, `ml` or
 `piece`. For readable photos with no quantity printed, omit measure and
 quantity ground truth; those do not affect the quantity denominator.
 `readable:false` items are retained in total count but excluded from
-the stated readable-image quality thresholds; disclose this count.
+the stated readable-image quality thresholds and do not count toward the
+required minimum 100 readable images; disclose this count.
 
 Run offline:
 ```sh
