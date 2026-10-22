@@ -16,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -73,7 +74,7 @@ private fun OfferEditor(
                     value = offer.price,
                     onValueChange = { onEdit(offer.copy(price = it)) },
                     label = { Text(stringResource(R.string.field_price)) },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).testTag("offer-$number-price"),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true
                 )
@@ -81,7 +82,7 @@ private fun OfferEditor(
                     value = offer.quantity,
                     onValueChange = { onEdit(offer.copy(quantity = it)) },
                     label = { Text(stringResource(R.string.field_quantity)) },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).testTag("offer-$number-quantity"),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true
                 )
@@ -90,6 +91,7 @@ private fun OfferEditor(
                 for (measure in Measure.entries) {
                     FilterChip(
                         selected = offer.measure == measure,
+                        modifier = Modifier.testTag("offer-$number-measure-${measure.name}"),
                         onClick = { onEdit(offer.copy(measure = measure)) },
                         label = { Text(unitLabel(measure)) },
                         enabled = !busy
@@ -107,6 +109,7 @@ private fun OfferEditor(
             Row {
                 Checkbox(
                     checked = offer.confirmed,
+                    modifier = Modifier.testTag("offer-$number-confirm"),
                     onCheckedChange = onConfirm,
                     enabled = !busy && valid
                 )
@@ -156,7 +159,9 @@ fun CompareScreen(
             !offers.all { it.confirmed } ->
                 Text(stringResource(R.string.comparison_must_confirm))
             first.measure != second.measure ->
-                Text(stringResource(R.string.comparison_incompatible), color = MaterialTheme.colorScheme.error)
+                Text(stringResource(R.string.comparison_incompatible),
+                    modifier = Modifier.testTag("comparison-incompatible"),
+                    color = MaterialTheme.colorScheme.error)
             else -> {
                 val result = UnitPriceCalculator.compare(first, second)
                 val unit = standardUnitLabel(result.first.standardUnit)
@@ -166,6 +171,7 @@ fun CompareScreen(
                     Text(stringResource(R.string.comparison_tie), style = MaterialTheme.typography.titleMedium)
                 } else {
                     Text(stringResource(R.string.comparison_winner, result.cheaperIndex + 1),
+                        modifier = Modifier.testTag("comparison-winner"),
                         style = MaterialTheme.typography.titleMedium)
                     val gap = if (result.savedRubPerUnit.signum() == 0)
                         stringResource(R.string.saving_under_kopeck)
