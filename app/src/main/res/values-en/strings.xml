@@ -46,4 +46,9 @@
  <string name="source_normal">Product price</string>
  <string name="word_bounds">Text region coordinates</string>
  <string name="empty_text">No text recognized</string>
+ <string name="camera_title">Photograph a price label</string>
+ <string name="camera_capture">Capture price label</string>
+ <string name="camera_cancel">Cancel</string>
+ <string name="camera_initializing">Starting camera…</string>
+ <string name="camera_failure">Camera unavailable: %1$s</string>
 </resources>

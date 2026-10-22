@@ -46,4 +46,9 @@
  <string name="source_normal">Цена товара</string>
  <string name="word_bounds">Координаты текстовых областей</string>
  <string name="empty_text">Текст не распознан</string>
+ <string name="camera_title">Сфотографировать ценник</string>
+ <string name="camera_capture">Снять ценник</string>
+ <string name="camera_cancel">Отмена</string>
+ <string name="camera_initializing">Запуск камеры…</string>
+ <string name="camera_failure">Камера недоступна: %1$s</string>
 </resources>
