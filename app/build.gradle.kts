@@ -15,7 +15,13 @@ android {
   versionCode = 1
   versionName = "0.0.1-ocr-probe"
   testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-  ndk { abiFilters += listOf("arm64-v8a") }
+  // Production remains ARM64-only. An explicit CI-only property enables
+  // runtime instrumentation on the Linux x86_64 Android emulator.
+  val instrumentationAbi = providers.gradleProperty("fairprice.ocrTestAbi").orNull
+  require(instrumentationAbi == null || instrumentationAbi == "x86_64") {
+    "Only x86_64 is permitted as the test-only override"
+  }
+  ndk { abiFilters += listOf(instrumentationAbi ?: "arm64-v8a") }
  }
  buildFeatures { compose = true }
  compileOptions {
