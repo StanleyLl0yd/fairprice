@@ -16,7 +16,10 @@ jobs:
           java-version: '25'
       - name: Android SDK 37
         run: |
-          sdkmanager "platforms;android-37" "build-tools;36.0.0"
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          SDK_MGR="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+          test -n "$SDK_MGR" || { echo "sdkmanager not found"; exit 1; }
+          "$SDK_MGR" --sdk_root="$SDK_ROOT" "platforms;android-37" "build-tools;36.0.0"
       - name: Obtain offline model for packaging
         run: bash tools/fetch-ocr-model.sh
       - uses: gradle/actions/setup-gradle@v4
