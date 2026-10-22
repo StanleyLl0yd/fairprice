@@ -58,4 +58,7 @@
  <string name="camera_cancel">Отмена</string>
  <string name="camera_initializing">Запуск камеры…</string>
  <string name="camera_failure">Камера недоступна: %1$s</string>
+ <string name="camera_for_offer">Снять ценник товара %1$d</string>
+ <string name="camera_permission_denied">Для съёмки нужно разрешить доступ к камере. Ручной ввод и выбор фотографии остаются доступны.</string>
+ <string name="camera_invalid_result">Не удалось получить фотографию из камеры.</string>
 </resources>

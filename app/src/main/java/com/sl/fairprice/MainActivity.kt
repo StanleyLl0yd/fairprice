@@ -1,5 +1,10 @@
 package com.sl.fairprice
 
+import android.Manifest
+import android.app.Activity
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.os.Bundle
@@ -30,7 +35,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import com.sl.fairprice.camera.PriceCameraActivity
 import com.sl.fairprice.camera.OcrImageLoader
+import java.io.File
 import com.sl.fairprice.history.ComparisonHistory
 import com.sl.fairprice.history.SavedComparison
 import com.sl.fairprice.pricing.PriceEntry
@@ -67,51 +75,81 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                fun processOfferImage(uri: Uri, target: Int, ephemeral: File? = null) {
+                    if (busy) {
+                        ephemeral?.delete()
+                        return
+                    }
+                    scope.launch {
+                        busy = true
+                        failure = null
+                        try {
+                            val recognized = withContext(Dispatchers.IO) {
+                                val bitmap = OcrImageLoader.decode(this@MainActivity, uri)
+                                try { TesseractOfflineOcr(this@MainActivity).recognize(bitmap) }
+                                finally { bitmap.recycle() }
+                            }
+                            val parsed = PriceLabelParser.parse(recognized.text)
+                            // Reference unit and loyalty-only prices are never silently trusted.
+                            val regular = parsed.prices.filter {
+                                it.kind == PriceKind.REGULAR
+                            }.singleOrNull()
+                            val quantity = parsed.quantities.singleOrNull()
+                            val details = getString(
+                                R.string.ocr_candidate_counts,
+                                parsed.prices.size,
+                                parsed.quantities.size,
+                                recognized.meanConfidence
+                            )
+                            offers = offers.mapIndexed { index, offer ->
+                                if (index != target) offer else offer.copy(
+                                    price = regular?.amountRub?.toPlainString() ?: "",
+                                    quantity = quantity?.amount?.toPlainString() ?: "",
+                                    measure = quantity?.measure ?: offer.measure,
+                                    confirmed = false,
+                                    ocrText = recognized.text.take(1500),
+                                    ocrDetails = details
+                                )
+                            }
+                        } catch (e: Exception) {
+                            failure = e.message ?: e.javaClass.simpleName
+                        } finally {
+                            ephemeral?.delete() // private capture cache, never retained
+                            busy = false
+                        }
+                    }
+                }
+
                 val picker = rememberLauncherForActivityResult(
                     ActivityResultContracts.PickVisualMedia()
                 ) { uri ->
-                    if (uri != null && !busy) {
-                        val target = photoTarget
-                        scope.launch {
-                            busy = true
-                            failure = null
-                            try {
-                                val recognized = withContext(Dispatchers.IO) {
-                                    val bitmap = OcrImageLoader.decode(this@MainActivity, uri)
-                                    try {
-                                        TesseractOfflineOcr(this@MainActivity).recognize(bitmap)
-                                    } finally {
-                                        bitmap.recycle()
-                                    }
-                                }
-                                val parsed = PriceLabelParser.parse(recognized.text)
-                                // A reference price or card-only price must never silently
-                                // be used as the normal package price.
-                                val regular = parsed.prices.filter { it.kind == PriceKind.REGULAR }
-                                    .singleOrNull()
-                                val quantity = parsed.quantities.singleOrNull()
-                                val details = getString(
-                                    R.string.ocr_candidate_counts,
-                                    parsed.prices.size,
-                                    parsed.quantities.size,
-                                    recognized.meanConfidence
-                                )
-                                offers = offers.mapIndexed { index, offer ->
-                                    if (index != target) offer else offer.copy(
-                                        price = regular?.amountRub?.toPlainString() ?: "",
-                                        quantity = quantity?.amount?.toPlainString() ?: "",
-                                        measure = quantity?.measure ?: offer.measure,
-                                        confirmed = false,
-                                        ocrText = recognized.text.take(1500),
-                                        ocrDetails = details
-                                    )
-                                }
-                            } catch (e: Exception) {
-                                failure = e.message ?: e.javaClass.simpleName
-                            } finally {
-                                busy = false
-                            }
+                    if (uri != null) processOfferImage(uri, photoTarget)
+                }
+
+                val cameraResult = rememberLauncherForActivityResult(
+                    ActivityResultContracts.StartActivityForResult()
+                ) { result ->
+                    if (result.resultCode == Activity.RESULT_OK) {
+                        val path = result.data?.getStringExtra(
+                            PriceCameraActivity.EXTRA_LOCAL_IMAGE_PATH
+                        )
+                        val directory = File(cacheDir, PriceCameraActivity.CAPTURE_DIR).canonicalFile
+                        val photo = path?.let { File(it).canonicalFile }
+                        if (photo != null && photo.isFile && photo.parentFile == directory &&
+                            photo.extension.equals("jpg", ignoreCase = true)) {
+                            processOfferImage(Uri.fromFile(photo), photoTarget, photo)
+                        } else {
+                            failure = getString(R.string.camera_invalid_result)
                         }
+                    }
+                }
+                val permission = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestPermission()
+                ) { granted ->
+                    if (granted) {
+                        cameraResult.launch(Intent(this@MainActivity, PriceCameraActivity::class.java))
+                    } else {
+                        failure = getString(R.string.camera_permission_denied)
                     }
                 }
 
@@ -137,6 +175,18 @@ class MainActivity : ComponentActivity() {
                             onPhoto = { index ->
                                 photoTarget = index
                                 picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            },
+                            onCamera = { index ->
+                                if (!busy) {
+                                    photoTarget = index
+                                    if (ContextCompat.checkSelfPermission(
+                                            this@MainActivity, Manifest.permission.CAMERA
+                                        ) == PackageManager.PERMISSION_GRANTED) {
+                                        cameraResult.launch(Intent(this@MainActivity, PriceCameraActivity::class.java))
+                                    } else {
+                                        permission.launch(Manifest.permission.CAMERA)
+                                    }
+                                }
                             }
                         )
                         val offerA = PriceEntry.offer(offers[0].price, offers[0].quantity, offers[0].measure)
