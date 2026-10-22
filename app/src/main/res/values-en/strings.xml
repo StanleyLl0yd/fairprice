@@ -46,4 +46,11 @@
  <string name="source_normal">Product price</string>
  <string name="word_bounds">Text region coordinates</string>
  <string name="empty_text">No text recognized</string>
+ <string name="history_title">Comparison history</string>
+ <string name="history_description">Only confirmed prices and quantities are saved. No photos or OCR text. Up to 50 entries, stored on this device only.</string>
+ <string name="history_save">Save comparison</string>
+ <string name="history_empty">No saved comparisons yet.</string>
+ <string name="history_offer_pair">%1$s RUB for %2$s / %5$s and %3$s RUB for %4$s / %5$s</string>
+ <string name="history_restore">Restore to compare</string>
+ <string name="history_delete">Delete</string>
 </resources>
