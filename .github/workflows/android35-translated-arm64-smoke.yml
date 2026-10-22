@@ -1,0 +1,59 @@
+name: Android 15 ARM64 translated OCR smoke
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/android35-translated-arm64-smoke.yml'
+
+permissions:
+  contents: read
+jobs:
+  translated-arm64:
+    name: Android 15 translated ARM64 JNI smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Enable KVM
+        run: |
+          test -e /dev/kvm
+          sudo chmod 666 /dev/kvm
+      - name: Android SDK 37
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          SDK_MGR="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+          test -n "$SDK_MGR"
+          "$SDK_MGR" --sdk_root="$SDK_ROOT" "platforms;android-37.0" "build-tools;36.0.0"
+      - name: Obtain pinned offline Russian OCR model
+        run: bash tools/fetch-ocr-model.sh
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Run default arm64-v8a app on Android 15 x86_64 native bridge
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_5
+          cores: 2
+          ram-size: 3072M
+          heap-size: 384M
+          emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim -gpu swiftshader_indirect
+          script: |
+            adb shell getprop ro.product.cpu.abilist
+            adb shell getprop ro.dalvik.vm.native.bridge
+            adb shell getprop ro.product.cpu.abilist | grep -F "arm64-v8a"
+            ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android15-arm64-translation-diagnostics
+          path: |
+            app/build/reports/androidTests/**
+            app/build/outputs/androidTest-results/**
+          if-no-files-found: ignore
