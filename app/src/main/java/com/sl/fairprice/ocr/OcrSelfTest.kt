@@ -50,7 +50,10 @@ object OcrSelfTest {
         val confidence = result.meanConfidence in 0..100
         val passed = cyrillic && price && quantity && boxes && confidence
         val diagnostic = buildString {
-            appendLine("FairPrice OCR preview 0.0.1 - synthetic self-test")
+            @Suppress("DEPRECATION")
+            val appVersion = context.packageManager
+                .getPackageInfo(context.packageName, 0).versionName ?: "unknown"
+            appendLine("FairPrice $appVersion - synthetic self-test")
             appendLine("Overall: " + (if (passed) "PASS" else "FAIL"))
             appendLine("Android API: " + Build.VERSION.SDK_INT)
             appendLine("ABI: " + Build.SUPPORTED_ABIS.joinToString(","))

@@ -57,3 +57,7 @@ The signature is not proof of OCR quality. The Stage 0 Android/device and
 ## Follow-up signed comparison preview
 
 Release `v0.0.2-comparison-preview.3` increments `versionCode` from 2 to 3. The prerelease workflow `comparison-signed-preview.yml` runs only after exact-main CI success (or explicit dispatch with the same guard), uses existing protected `android-signing` secrets and rejects any certificate SHA-256 different from `v0.0.1-ocr-preview.2`. The previous prerelease tags and signatures remain immutable. No further keystore transfer is needed.
+
+## Signed Beta 1
+
+Workflow `beta-signed-release.yml` uses the already configured `android-signing` environment. `versionCode 4` upgrades signed preview.3 (`versionCode 3`) in place; CI rejects a signing certificate mismatch against `v0.0.2-comparison-preview.3`. The original keystore remains in the user's custody; no secret upload is required for Beta 1.

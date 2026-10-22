@@ -65,3 +65,7 @@ The independently testable **debug-signed prerelease** is produced through GitHu
 ## Signed offline two-offer comparison preview
 
 Tag `v0.0.2-comparison-preview.3` is generated from an exact-CI-proven protected main commit through GitHub Environment signing, with the public release certificate SHA-256 matched against the existing signed preview.2. It contains manual two-offer comparison, per-product offline image OCR suggestions and explicit confirmation. The existing signed preview.2 remains unchanged and can be upgraded in place. This is **not** OCR Stage 0 acceptance or RuStore publication.
+
+## FairPrice Beta 1
+
+The signed `v0.1.0-beta.1` APK and AAB include offline Photo Picker/CameraX OCR, manual comparison with verified price/quantity, and local history. Built from protected exact-main CI with the existing signing key. This is a **GitHub prerelease** for device testing, not a RuStore/public production release or proof of real-photo OCR accuracy. See [beta readiness](docs/BETA_READINESS.md).
