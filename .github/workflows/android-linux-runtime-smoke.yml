@@ -1,0 +1,60 @@
+name: Android Linux runtime OCR smoke
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/android-linux-runtime-smoke.yml'
+      - 'app/build.gradle.kts'
+      - 'app/src/androidTest/**'
+permissions:
+  contents: read
+jobs:
+  android-runtime:
+    name: x86_64 emulator OCR instrumentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Enable hardware accelerated Linux emulator
+        run: |
+          test -e /dev/kvm
+          sudo chmod 666 /dev/kvm
+      - name: Install Android SDK 37
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          SDK_MGR="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+          test -n "$SDK_MGR" || exit 1
+          "$SDK_MGR" --sdk_root="$SDK_ROOT" "platforms;android-37.0" "build-tools;36.0.0"
+      - name: Download pinned offline OCR model
+        run: bash tools/fetch-ocr-model.sh
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Run real Android runtime tests on x86_64 emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          profile: pixel_4
+          cores: 2
+          ram-size: 2048M
+          heap-size: 384M
+          emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim -gpu swiftshader_indirect
+          script: |
+            abi="$(adb shell getprop ro.product.cpu.abi | tr -d '\r')"
+            echo "Android emulator ABI: $abi"
+            test "$abi" = "x86_64"
+            ./gradlew -Pfairprice.ocrTestAbi=x86_64 :app:connectedDebugAndroidTest --no-daemon --stacktrace
+      - name: Preserve instrumentation diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-x86_64-ocr-diagnostics
+          path: |
+            app/build/reports/androidTests/**
+            app/build/outputs/androidTest-results/**
+          if-no-files-found: ignore
