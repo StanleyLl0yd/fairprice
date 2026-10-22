@@ -58,4 +58,7 @@
  <string name="camera_cancel">Cancel</string>
  <string name="camera_initializing">Starting camera…</string>
  <string name="camera_failure">Camera unavailable: %1$s</string>
+ <string name="camera_for_offer">Capture product %1$d price tag</string>
+ <string name="camera_permission_denied">Camera access is needed for capture. Manual entry and photo selection remain available.</string>
+ <string name="camera_invalid_result">Unable to access captured image.</string>
 </resources>

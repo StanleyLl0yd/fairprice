@@ -11,6 +11,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.MaterialTheme
@@ -63,7 +64,8 @@ private fun OfferEditor(
     busy: Boolean,
     onEdit: (OfferDraft) -> Unit,
     onConfirm: (Boolean) -> Unit,
-    onPhoto: () -> Unit
+    onPhoto: () -> Unit,
+    onCamera: () -> Unit
 ) {
     val valid = PriceEntry.offer(offer.price, offer.quantity, offer.measure) != null
     Card(Modifier.fillMaxWidth()) {
@@ -101,6 +103,13 @@ private fun OfferEditor(
             Button(onClick = onPhoto, enabled = !busy) {
                 Text(stringResource(R.string.photo_for_offer, number))
             }
+            OutlinedButton(
+                onClick = onCamera,
+                enabled = !busy,
+                modifier = Modifier.testTag("offer-$number-camera")
+            ) {
+                Text(stringResource(R.string.camera_for_offer, number))
+            }
             if (offer.ocrText.isNotBlank()) {
                 Text(stringResource(R.string.ocr_check_values), color = MaterialTheme.colorScheme.error)
                 Text(offer.ocrDetails, style = MaterialTheme.typography.bodySmall)
@@ -133,7 +142,8 @@ fun CompareScreen(
     busy: Boolean,
     onEdit: (Int, OfferDraft) -> Unit,
     onConfirm: (Int, Boolean) -> Unit,
-    onPhoto: (Int) -> Unit
+    onPhoto: (Int) -> Unit,
+    onCamera: (Int) -> Unit
 ) {
     require(offers.size == 2)
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -146,7 +156,8 @@ fun CompareScreen(
                 busy = busy,
                 onEdit = { onEdit(index, it) },
                 onConfirm = { onConfirm(index, it) },
-                onPhoto = { onPhoto(index) }
+                onPhoto = { onPhoto(index) },
+                onCamera = { onCamera(index) }
             )
         }
         HorizontalDivider()

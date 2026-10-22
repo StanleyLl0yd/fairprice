@@ -25,6 +25,8 @@ class ComparisonUiTest {
     }
 
     @Test fun manualComparisonRequiresConfirmationAndRevokesItOnEdit() {
+        compose.onNodeWithTag("offer-1-camera").performScrollTo().assertExists()
+        compose.onNodeWithTag("offer-2-camera").performScrollTo().assertExists()
         compose.onNodeWithTag("offer-1-confirm").performScrollTo().assertIsNotEnabled()
         enter(1, "100", "500")
         enter(2, "120", "400")
