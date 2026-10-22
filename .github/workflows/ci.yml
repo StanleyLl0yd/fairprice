@@ -14,9 +14,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
-      - uses: android-actions/setup-android@v3
       - name: Android SDK 37
-        run: sdkmanager "platforms;android-37" "build-tools;36.0.0"
+        run: |
+          sdkmanager "platforms;android-37" "build-tools;36.0.0"
       - name: Obtain offline model for packaging
         run: bash tools/fetch-ocr-model.sh
       - uses: gradle/actions/setup-gradle@v4
