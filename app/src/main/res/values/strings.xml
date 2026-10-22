@@ -53,4 +53,9 @@
  <string name="history_offer_pair">%1$s ₽ за %2$s / %5$s и %3$s ₽ за %4$s / %5$s</string>
  <string name="history_restore">Вернуть для сравнения</string>
  <string name="history_delete">Удалить</string>
+ <string name="camera_title">Сфотографировать ценник</string>
+ <string name="camera_capture">Снять ценник</string>
+ <string name="camera_cancel">Отмена</string>
+ <string name="camera_initializing">Запуск камеры…</string>
+ <string name="camera_failure">Камера недоступна: %1$s</string>
 </resources>
