@@ -23,31 +23,57 @@ data class ParsedLabel(
     val needsReview: Boolean
 )
 
-/** OCR-independent and conservative. No invented measurements. */
+/**
+ * OCR-independent, conservative label interpretation.
+ * A number may be a sale price, reference price, loyalty price, amount or
+ * percentage. Ambiguous values must always be reviewed by the user.
+ */
 object PriceLabelParser {
-    private val priceWithCurrency =
-        Regex("""(?<![\d])(\d{1,7}(?:[ \u00A0]\d{3})*(?:[.,]\d{1,2})?)\s*(?:₽|руб\.?|р\.)""", RegexOption.IGNORE_CASE)
-    private val barePrice =
-        Regex("""(?<![\d.,])(\d{1,5}[.,]\d{2})(?!\d)""")
-    private val unitPrice =
-        Regex("""(?:цена\s+)?за\s*(?:1\s*)?(?:кг|килограмм|л|литр|шт)(?![\p{L}\d])""", RegexOption.IGNORE_CASE)
-    private val loyalty =
-        Regex("""(?:по\s+карте|с\s+картой|карта\s+магазина)""", RegexOption.IGNORE_CASE)
-    private val multiple =
-        Regex("""(\d+)\s*(?:шт\.?\s*по|[xх×*])\s*(\d+(?:[.,]\d+)?)\s*(кг|гр?\.?|г|мл|л)(?![\p{L}\d])""", RegexOption.IGNORE_CASE)
-    private val unit =
-        Regex("""(?<![\d])(\d+(?:[.,]\d+)?)\s*(кг|гр?\.?|г|мл|л|шт\.?)(?![\p{L}\d])""", RegexOption.IGNORE_CASE)
-    private val count = Regex("""(?<![\d])(\d+)\s*шт\.?""", RegexOption.IGNORE_CASE)
+    private val priceWithCurrency = Regex(
+        """(?<!\d)(\d{1,7}(?:[ \u00A0\u202F]\d{3})*(?:[.,]\d{1,2})?)\s*(?:₽|руб\.?|р\.)(?![\p{L}\d])""",
+        RegexOption.IGNORE_CASE
+    )
+    private val barePrice = Regex(
+        """(?<![\d.,])(\d{1,3}(?:[ \u00A0\u202F]\d{3})+[.,]\d{2}|\d{1,5}[.,]\d{2})(?!\d)"""
+    )
+    private val referenceUnit = Regex(
+        """(?:цена\s+|стоимость\s+)?за\s*(?:1\s*)?(?:кг|килограмм(?:а|ов)?|л|литр(?:а|ов)?|шт\.?)(?![\p{L}\d])""",
+        RegexOption.IGNORE_CASE
+    )
+    private val loyalty = Regex(
+        """(?:по\s+карте|с\s+картой|карта\s+магазина)""", RegexOption.IGNORE_CASE
+    )
+    private val discount = Regex(
+        """(?:скидк\p{L}*|экономи\p{L}*|уценк\p{L}*)""", RegexOption.IGNORE_CASE
+    )
+    private val forwardMultipack = Regex(
+        """(\d+)\s*(?:шт\.?\s*по\s*|[xх×*]\s*)(\d+(?:[.,]\d+)?)\s*(кг|гр?\.?|мл|л)(?![\p{L}\d])""",
+        RegexOption.IGNORE_CASE
+    )
+    private val reverseMultipack = Regex(
+        """(\d+(?:[.,]\d+)?)\s*(кг|гр?\.?|мл|л)\s*[xх×*]\s*(\d+)(?![\d])""",
+        RegexOption.IGNORE_CASE
+    )
+    private val unit = Regex(
+        """(?<![\d.,])(\d+(?:[.,]\d+)?)\s*(кг|гр?\.?|мл|л|шт\.?)(?![\p{L}\d])""",
+        RegexOption.IGNORE_CASE
+    )
+    private val numberWithPieces = Regex(
+        """(?<!\d)(\d+)\s*шт\.?(?![\p{L}\d])""", RegexOption.IGNORE_CASE
+    )
+    private val adjacentUnit = Regex(
+        """^(?:кг|гр?\.?|г|мл|л|шт\.?)(?![\p{L}\d])""", RegexOption.IGNORE_CASE
+    )
 
     private fun decimal(input: String): BigDecimal? =
-        input.replace(" ", "").replace("\u00A0", "").replace(',', '.')
-            .toBigDecimalOrNull()?.takeIf { it.signum() > 0 }
+        input.replace(" ", "").replace("\u00A0", "").replace("\u202F", "")
+            .replace(',', '.').toBigDecimalOrNull()?.takeIf { it.signum() > 0 }
 
-    private fun clean(number: BigDecimal): BigDecimal =
-        number.stripTrailingZeros().toPlainString().toBigDecimal()
+    private fun clean(value: BigDecimal): BigDecimal =
+        value.stripTrailingZeros().toPlainString().toBigDecimal()
 
-    private fun metric(number: BigDecimal, unit: String): Pair<BigDecimal, Measure>? =
-        when (unit.lowercase().trimEnd('.')) {
+    private fun metric(number: BigDecimal, u: String): Pair<BigDecimal, Measure>? =
+        when (u.lowercase().trimEnd('.')) {
             "кг" -> clean(number.multiply(BigDecimal("1000"))) to Measure.GRAM
             "г", "гр" -> number to Measure.GRAM
             "л" -> clean(number.multiply(BigDecimal("1000"))) to Measure.MILLILITRE
@@ -56,60 +82,86 @@ object PriceLabelParser {
             else -> null
         }
 
+    private fun overlaps(a: IntRange, b: IntRange): Boolean =
+        a.first <= b.last && b.first <= a.last
+
     fun parse(text: String): ParsedLabel {
         val prices = mutableListOf<PriceCandidate>()
         val quantities = mutableListOf<QuantityCandidate>()
-        val lines = text.lineSequence().map { it.trim() }.filter { it.isNotBlank() }.toList()
-        for (line in lines) {
-            val reference = unitPrice.containsMatchIn(line)
+        for (line in text.lineSequence().map(String::trim).filter(String::isNotEmpty)) {
+            val references = referenceUnit.findAll(line).map { it.range }.toList()
             val explicit = priceWithCurrency.findAll(line).toList()
-            val matches = if (explicit.isNotEmpty()) explicit else {
-                barePrice.findAll(line).filterNot {
-                    line.contains("%") || line.contains("скидк", ignoreCase = true)
-                }.toList()
-            }
-            for (m in matches) {
-                val previous = matches.lastOrNull { it.range.last < m.range.first }
-                val contextStart = (previous?.range?.last?.plus(1)) ?: 0
-                val prefix = line.substring(contextStart, m.range.first)
+            val matches = if (explicit.isNotEmpty()) explicit else barePrice.findAll(line).filter { m ->
+                val after = line.substring(m.range.last + 1).trimStart()
+                val before = line.substring(0, m.range.first).takeLast(20)
+                !after.startsWith('%') &&
+                    !adjacentUnit.containsMatchIn(after) &&
+                    !discount.containsMatchIn(before)
+            }.toList()
+
+            matches.forEachIndexed { index, m ->
+                val previousEnd = matches.getOrNull(index - 1)?.range?.last?.plus(1) ?: 0
+                val before = line.substring(previousEnd, m.range.first)
+                val after = if (index == matches.lastIndex) line.substring(m.range.last + 1) else ""
                 val kind = when {
-                    unitPrice.containsMatchIn(prefix) -> PriceKind.REFERENCE
-                    loyalty.containsMatchIn(prefix) -> PriceKind.CARD
+                    referenceUnit.containsMatchIn(before) -> PriceKind.REFERENCE
+                    loyalty.containsMatchIn(before) || loyalty.containsMatchIn(after) -> PriceKind.CARD
                     else -> PriceKind.REGULAR
                 }
-                decimal(m.groupValues[1])?.let {
-                    prices += PriceCandidate(it, kind, line, explicit.isEmpty() || kind != PriceKind.REGULAR)
+                decimal(m.groupValues[1])?.let { amount ->
+                    prices += PriceCandidate(
+                        amount, kind, line,
+                        explicit.isEmpty() || kind != PriceKind.REGULAR
+                    )
                 }
             }
-            val multi = multiple.find(line)
-            if (multi != null) {
-                val n = decimal(multi.groupValues[1])
-                val one = decimal(multi.groupValues[2])
-                val measurement = one?.let { metric(it, multi.groupValues[3]) }
-                if (n != null && measurement != null) {
+
+            // Keep multipack ranges together, rather than emitting competing
+            // "4 pieces" and "125 grams" for "4 pieces of 125 grams".
+            val occupied = mutableListOf<IntRange>()
+            for (m in forwardMultipack.findAll(line)) {
+                val n = decimal(m.groupValues[1])
+                val each = decimal(m.groupValues[2])
+                val value = each?.let { metric(it, m.groupValues[3]) }
+                if (n != null && value != null && references.none { overlaps(it, m.range) }) {
                     quantities += QuantityCandidate(
-                        clean(n.multiply(measurement.first)), measurement.second, line, false)
+                        clean(n.multiply(value.first)), value.second, line, false
+                    )
+                    occupied += m.range
                 }
-            } else if (!reference) {
-                for (m in unit.findAll(line)) {
-                    val v = decimal(m.groupValues[1]) ?: continue
-                    val measurement = metric(v, m.groupValues[2]) ?: continue
-                    quantities += QuantityCandidate(measurement.first, measurement.second, line, false)
+            }
+            for (m in reverseMultipack.findAll(line)) {
+                if (occupied.any { overlaps(it, m.range) }) continue
+                val each = decimal(m.groupValues[1])
+                val n = decimal(m.groupValues[3])
+                val value = each?.let { metric(it, m.groupValues[2]) }
+                if (n != null && value != null && references.none { overlaps(it, m.range) }) {
+                    quantities += QuantityCandidate(
+                        clean(n.multiply(value.first)), value.second, line, false
+                    )
+                    occupied += m.range
                 }
-                if (quantities.none { it.source == line && it.measure == Measure.PIECE }) {
-                    count.find(line)?.let { c ->
-                        decimal(c.groupValues[1])?.let {
-                            quantities += QuantityCandidate(it, Measure.PIECE, line, false)
-                        }
-                    }
+            }
+            for (m in unit.findAll(line)) {
+                if (occupied.any { overlaps(it, m.range) } ||
+                    references.any { overlaps(it, m.range) }) continue
+                val v = decimal(m.groupValues[1])?.let { metric(it, m.groupValues[2]) } ?: continue
+                quantities += QuantityCandidate(v.first, v.second, line, false)
+                occupied += m.range
+            }
+            for (m in numberWithPieces.findAll(line)) {
+                if (occupied.any { overlaps(it, m.range) } ||
+                    references.any { overlaps(it, m.range) }) continue
+                decimal(m.groupValues[1])?.let {
+                    quantities += QuantityCandidate(it, Measure.PIECE, line, false)
                 }
             }
         }
         val distinctPrices = prices.distinctBy { Triple(it.amountRub, it.kind, it.source) }
-        val distinctQty = quantities.distinctBy { Triple(it.amount, it.measure, it.source) }
-        val salePrices = distinctPrices.filter { it.kind != PriceKind.REFERENCE }
-        return ParsedLabel(distinctPrices, distinctQty,
-            salePrices.size != 1 || distinctQty.size != 1 ||
-            distinctPrices.any { it.requiresConfirmation })
+        val distinctQuantities = quantities.distinctBy { Triple(it.amount, it.measure, it.source) }
+        val available = distinctPrices.filter { it.kind != PriceKind.REFERENCE }
+        return ParsedLabel(distinctPrices, distinctQuantities,
+            needsReview = available.size != 1 || distinctQuantities.size != 1 ||
+                distinctPrices.any { it.requiresConfirmation })
     }
 }
