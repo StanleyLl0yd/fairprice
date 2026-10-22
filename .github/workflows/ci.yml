@@ -49,7 +49,16 @@ jobs:
             exit 1
           fi
           native="$(unzip -Z1 "$apk" | grep '^lib/' || true)"
-          if ! grep -q '^lib/arm64-v8a/libtesseract.so
+          if ! grep -q '^lib/arm64-v8a/libtesseract[.]so
+            echo "ERROR: arm64-v8a native Tesseract library missing from APK"
+            exit 1
+          fi
+          if grep -Eq '^lib/(x86|x86_64|armeabi-v7a)/' <<< "$native"; then
+            echo "ERROR: unexpected extra native ABI packaged"
+            exit 1
+          fi
+          echo "PASS: APK offline permission, OCR model SHA-256 and native ABI"
+      - uses: actions/upload-artifact@v4
         with:
           name: fairprice-ocr-prototype-debug
           path: app/build/outputs/apk/debug/*.apk
