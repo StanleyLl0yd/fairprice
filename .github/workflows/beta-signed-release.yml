@@ -10,7 +10,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: fairprice-signed-v0-1-0-beta-1
+  group: fairprice-signed-v0-1-0-beta-1-no-deployment
   cancel-in-progress: false
 
 jobs:
@@ -24,7 +24,9 @@ jobs:
     name: Build signed arm64 APK and AAB
     runs-on: ubuntu-latest
     timeout-minutes: 35
-    environment: android-signing
+    environment:
+      name: android-signing
+      deployment: false
     steps:
       - name: Checkout trusted protected main
         uses: actions/checkout@v4

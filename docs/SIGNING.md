@@ -61,3 +61,7 @@ Release `v0.0.2-comparison-preview.3` increments `versionCode` from 2 to 3. The 
 ## Signed Beta 1
 
 Workflow `beta-signed-release.yml` uses the already configured `android-signing` environment. `versionCode 4` upgrades signed preview.3 (`versionCode 3`) in place; CI rejects a signing certificate mismatch against `v0.0.2-comparison-preview.3`. The original keystore remains in the user's custody; no secret upload is required for Beta 1.
+
+## Beta signing job does not create a deployment
+
+Because beta APK/AAB packaging is not an actual environment deployment, the `beta-signed-release.yml` job uses `environment: { name: android-signing, deployment: false }`. GitHub's environment access and protection checks still apply, and the key continues to live only in environment secrets. This avoids creating a pending deployment object for a package-signing operation. It does not bypass reviewers or wait timers if these are configured. The workflow still requires successful exact protected-main CI and verifies APK signing certificate continuity.
