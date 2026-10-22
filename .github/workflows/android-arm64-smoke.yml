@@ -27,7 +27,10 @@ jobs:
           test "$(uname -m)" = arm64
       - name: Install Android SDK platform
         run: |
-          sdkmanager "platforms;android-37.0" "build-tools;36.0.0"
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/Users/runner/Library/Android/sdk}}"
+          SDK_MGR="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+          test -n "$SDK_MGR" || { echo "SDK manager not found under $SDK_ROOT"; exit 1; }
+          "$SDK_MGR" --sdk_root="$SDK_ROOT" "platforms;android-37.0" "build-tools;36.0.0"
       - name: Fetch pinned offline OCR model
         run: bash tools/fetch-ocr-model.sh
       - uses: gradle/actions/setup-gradle@v4
