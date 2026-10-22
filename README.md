@@ -61,3 +61,7 @@ Stage 1-4 (math, UI comparison, camera, real-photo release testing) are not acce
 ## Installable OCR device preview
 
 The independently testable **debug-signed prerelease** is produced through GitHub Actions only after successful exact-main CI. See [test instructions](docs/TEST_RELEASE.md). The APK runs offline and includes a synthetic self-check with copyable diagnostics. **Neither a prerelease nor its self-check completes Stage 0 or constitutes authorization for RuStore publication.**
+
+## Signed offline two-offer comparison preview
+
+Tag `v0.0.2-comparison-preview.3` is generated from an exact-CI-proven protected main commit through GitHub Environment signing, with the public release certificate SHA-256 matched against the existing signed preview.2. It contains manual two-offer comparison, per-product offline image OCR suggestions and explicit confirmation. The existing signed preview.2 remains unchanged and can be upgraded in place. This is **not** OCR Stage 0 acceptance or RuStore publication.
